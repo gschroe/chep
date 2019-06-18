@@ -9,4 +9,4 @@ The k-means clustering and elbow tests are implemented using Sklearn modules. Th
 usage: for example
 
 
-python chep2.py --infile relion_2dclassification.star --cluster_num 4
+python chep.py --infile relion_2dclassification.star --cluster_num 4
