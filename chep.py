@@ -23,7 +23,6 @@ parser.add_option("--cluster_num", type="int", default="3", help="Number of clus
 parser.add_option("--elbow_clusters", type="int", default="11", help="Maximum number of clusters for Elbows test")
 (options,args) = parser.parse_args()
 
-
 class read_relion(object):
 
     def __init__(self, file):
@@ -45,11 +44,7 @@ class read_relion(object):
             else:
                 Rdata.append(star_line.split())
                 
-        return Rvar, Rdata
-    
-    
-        
-
+        return Rvar, Rdata       
 
 class write_relion(object):
     def __init__(self, file_nr, cluster_info):
@@ -73,11 +68,7 @@ class write_relion(object):
             with open(filename, "a") as file:
                 for item in self.cluster_info:
                     fullstr = '  '.join([str(elem) for elem in item ])
-                    file.writelines("%s\n" % fullstr)   
-   
-
-     
-        
+                    file.writelines("%s\n" % fullstr)      
 
 relion_data = read_relion(options.infile)
 
@@ -153,8 +144,7 @@ for ptcl in range(ptcl_nr):
     f, c = helixIDclass_data[ptcl,0], helixIDclass_data[ptcl,1]
     fc_matrix[int(f-1), int(c-1)] +=1
 fc_matrix = fc_matrix / fc_matrix.sum(axis=1,keepdims=True)
-    
-        
+
 kmeans = KMeans(n_clusters=options.cluster_num, random_state=20).fit(fc_matrix)
 y_kmeans = kmeans.predict(fc_matrix)
 print("kmeans clustering")
@@ -163,8 +153,8 @@ print("kmeans clustering")
 sklearn_pca = sklearnPCA(n_components=2)
 y_pca = sklearn_pca.fit_transform(fc_matrix)
 
-
 # writing clusters to files
+# an additional comment
 
 for cluster in range(options.cluster_num):
     cluster_data=[]
