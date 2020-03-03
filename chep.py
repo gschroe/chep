@@ -35,7 +35,7 @@ from sklearn.decomposition import PCA as sklearnPCA
 from scipy.spatial.distance import cdist
 from itertools import combinations
 
-CHEP_VERSION = "0.1.7"
+CHEP_VERSION = "0.1.9"
 
 progname = os.path.basename(sys.argv[0])
 parser = ArgumentParser(description="CHEP: Clustering of HElical " +
@@ -58,12 +58,20 @@ options = parser.parse_args()
 
 
 class ReadStar(object):
+    '''
+    Read in relion data STAR files
+    '''
     def __init__(self, infile):
         self.infile = infile
         self._var = None
         self._data = None
+        self._optics = None
 
     def var(self):
+        '''
+        Variables within the particle data loop of the relion STAR
+        file
+        '''
         if self._var:
             return self._var
         else:
@@ -71,18 +79,64 @@ class ReadStar(object):
             return self._var
 
     def data(self):
+        '''
+        Data loop of the relion STAR file as a list
+        '''
         if self._data:
             return self._data
         else:
             self._parse_file()
             return self._data
 
+    def data_array(self, nested=False):
+        '''
+        Data loop of the relion STAR file as an array
+        '''
+        if self._data:
+            if (len(self._var) == len(self._data[0])):
+                return np.asarray(self._data)
+            else:
+                print("ERROR: Number of metadata variables does" +
+                        "not match number of columns in the input" +
+                        "STAR file")
+                sys.exit(2)
+        elif nested:
+            print("ERROR: Recursion error when reading file")
+            sys.exit(2)
+        else:
+            self._parse_file()
+            return self.data_array(nested=True)
+
+    def optics(self):
+        '''
+        New relion STAR file format includes optics table, 
+        accessible by this method.
+        '''
+        if self._optics:
+            return self._optics
+        else:
+            self._parse_file()
+            return self._optics
+
     def _parse_file(self):
         var = [] #read the variables
         data = [] # read the data
+        optics = [] # store new relion optics data table
+
+        new_relion_star_format = False
 
         for line in open(self.infile).readlines():
-            if "_rln" in line:
+            if line[0] == "#":
+                continue
+            elif "data_optics" in line: 
+                new_relion_star_format = "OPTICS"
+            elif "data_particles" in line:
+                new_relion_star_format = "PARTICLES"
+
+            if new_relion_star_format == "OPTICS":
+                optics.append(line.strip())
+
+            elif "_rln" in line:
                 var.append(line.split()[0])
             elif ("data_" in line or
                     "loop_" in line or
@@ -92,17 +146,29 @@ class ReadStar(object):
                 data.append(line.split())
         self._var = var
         self._data = data
+        self._optics = optics
 
 
 class WriteStar(object):
-    def __init__(self, file_name, var, data):
+    '''
+    Write out relion-compatible STAR files
+    '''
+    def __init__(self, file_name, var, data, optics):
         self.file_name = file_name
         self.var = var
         self.data = data
+        self.optics = optics
 
     def write(self):
+        '''
+        Write out relion-compatible STAR files
+        '''
         with open(self.file_name, "w") as outfile:
-            outfile.write("\ndata_\n\nloop_\n")
+            if self.optics:
+                outfile.write("\n" + "\n".join(self.optics) + "\n")
+                outfile.write("\ndata_particles\n\nloop_\n")
+            else:
+                outfile.write("\ndata_\n\nloop_\n")
             for index, variable in enumerate(self.var):
                 outfile.write(variable + " #" + str(index + 1) + "\n")
             for item in self.data:
@@ -114,14 +180,8 @@ if __name__ == "__main__":
     instar = ReadStar(options.infile)
     rlnvar = instar.var()
     rlndata_list = instar.data()
-
-    if (len(rlnvar) ==
-            len(rlndata_list[0])):
-        rlndata = np.asarray(rlndata_list)
-    else:
-        print("ERROR: Number of metadata variables does not match " +
-                "number of columns in the input STAR file")
-        sys.exit(2)
+    rlndata = instar.data_array()
+    rlnoptics = instar.optics()
 
     rlnvar_nr = len(rlnvar)
     print("Number of parameters in the relion file = " +
@@ -218,7 +278,7 @@ if __name__ == "__main__":
                 ".chep_k" + str(options.cluster_num) + "_" +
                 cstr + ".star")
 
-        cluster_out = WriteStar(file_name, rlnvar, cluster_data)
+        cluster_out = WriteStar(file_name, rlnvar, cluster_data, rlnoptics)
         cluster_out.write()
 
     if options.elbow_clusters:
